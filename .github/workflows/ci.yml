@@ -1,0 +1,117 @@
+on: [push, pull_request]
+
+name: ci
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        # All generated code should be running on stable now
+        rust: [stable, 1.59.0]
+
+        # The default target we're compiling on and for
+        target:
+          - name: x86_64-unknown-linux-gnu
+            install_gcc: false
+
+          - name: arm-unknown-linux-gnueabihf
+            gcc: gcc-arm-linux-gnueabihf
+            install_gcc: true
+
+          - name: thumbv7m-none-eabi
+            gcc: gcc-arm-none-eabi
+            install_gcc: true
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          target: ${{ matrix.target.name }}
+          override: true
+
+      - name: Install gcc
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.target.gcc }}
+        if: matrix.target.install_gcc == true
+
+      - name: Run Check on ${{ matrix.target.name }} with Rust ${{ matrix.rust }}
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --target=${{ matrix.target.name }}
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Test all targets
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-targets
+
+  fmt:
+    name: Formatting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Install rustfmt
+        run: rustup component add rustfmt
+
+      - name: Run rustfmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Install clippy
+        run: rustup component add clippy
+
+      - name: Run clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
